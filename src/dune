@@ -1,0 +1,5 @@
+(executable
+ (name fugit)
+ (public_name fugit)
+ (libraries lwt.unix fmt obus.notification containers cmdliner bos calendar)
+)
