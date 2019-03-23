@@ -2,8 +2,8 @@
  (name fugit)
  (public_name fugit)
  (libraries
-   ptime lwt.unix fmt obus.notification
-   containers cmdliner bos calendar
+   lwt.unix fmt obus.notification
+   containers cmdliner calendar
    angstrom
   )
 )

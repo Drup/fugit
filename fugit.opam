@@ -1,0 +1,23 @@
+opam-version: "2.0"
+name: "fugit"
+maintainer: "Gabriel Radanne <drupyog@zoho.com>"
+authors: "Gabriel Radanne"
+license: "ISC"
+tags: ["time" "notification" "tool"]
+homepage: "https://github.com/Drup/fugit"
+bug-reports: "https://github.com/Drup/fugit/issues"
+depends: [
+  "ocaml" {>= "4.03"}
+  "dune" {build}
+  "lwt" "fmt" "obus"
+  "containers" "cmdliner"
+  "calendar"
+  "angstrom"
+]
+build: [
+  ["dune" "subst"] {pinned}
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+dev-repo: "git+https://github.com/Drup/fugit.git"
+synopsis: "Launch notifications at a given time"
