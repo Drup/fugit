@@ -5,6 +5,10 @@ type t = {
   stop : C.t ;
 }
 
+let of_period p =
+  let start = C.now () in
+  let stop = C.add start p in
+  { start ; stop }
 
 let calendar_pp_with fmt ppf d =
   let open CalendarLib in
@@ -36,15 +40,15 @@ module Raw = struct
 
   let arg =
     let i =
-      Arg.info ~docv:"START/STOP"
+      Arg.info ~docs:"DELAY" ~docv:"START/STOP"
         ~doc:"Provide the start and end time as pair of rfc3339 dates separated by /."
         ["raw-delay"]
     in
-    Arg.(required & opt (some & pair ~sep:'/' rfc3339 rfc3339) None i)
+    Arg.(value & opt (some & pair ~sep:'/' rfc3339 rfc3339) None i)
 
   let term =
     let f (start, stop) = { start ; stop } in
-    Cmdliner.Term.(pure f $ arg)
+    Cmdliner.Term.(pure (CCOpt.map f) $ arg)
 
   let pp ppf { start ; stop } =
     Fmt.pf ppf "%a/%a" printer start printer stop
@@ -213,32 +217,12 @@ module Parsing = struct
     duration
 
   let go l =
+    let map_error s =
+      Fmt.strf "Unrecognized duration: %s" s
+    in
     let s = String.concat " " l in
-    match Angstrom.parse_string (parser <** end_of_input) s with
-    | Ok x -> `Ok x
-    | Error s ->
-      let s = Fmt.strf "Unrecognized duration: %s" s in
-      `Error (false, s)
+    let r = Angstrom.parse_string (parser <** end_of_input) s in
+    CCResult.map_err map_error r
 end
 
-
-module Cmd = struct
-  open Cmdliner
-
-  let arg n =
-    let i =
-      Arg.info ~docv:"DELAY"
-        ~doc:"Delay before the alert."
-        []
-    in
-    let a = Arg.(non_empty & pos_right n string [] i) in
-    Term.(ret (pure Parsing.go $ a))
-
-  let term n =
-    let f dur =
-      let start = C.now () in
-      let stop = C.add start dur in
-      { start ; stop }
-    in
-    Cmdliner.Term.(pure f $ arg n)
-end
+let parse = Parsing.go
