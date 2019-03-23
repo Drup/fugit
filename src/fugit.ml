@@ -33,32 +33,28 @@ let alert_command =
   let f opts delay s =
     begin
       if opts.verbose then
-        let {Delay.start;stop} = delay in
-        let pp =
-          Cmdliner.Arg.(conv_printer @@ pair Delay.Arg.rfc3339 Delay.Arg.rfc3339)
-        in
-        Fmt.pr "Delay: %a@." pp (start,stop)
+        Fmt.pr "Delay: %a@." Delay.Raw.pp delay
     end;
     let n = Notif.make delay s in
     Delay_sleep.launch n >|= fun () ->
     `Ok ()
   in
   let cmd =
-    Term.(lwt_ret (pure f $ common_opts $ Delay.term_duration 0 $ message))
+    Term.(lwt_ret (pure f $ common_opts $ Delay.Cmd.term 0 $ message))
   in
   cmd, i
 
 let ding_command =
   let i =
     Term.info ~doc:"Launch an alert immediatly." "ding"
-  in 
+  in
   let f delay s =
     let n = Notif.make delay s in
     Notif.notif n >|= fun _ ->
     `Ok ()
   in
   let cmd =
-    Term.(lwt_ret (pure f $ Delay.term_raw $ message))
+    Term.(lwt_ret (pure f $ Delay.Raw.term $ message))
   in
   cmd, i
 
