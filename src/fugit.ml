@@ -1,11 +1,23 @@
 open Lwt.Infix
+open Cmdliner
 
 (* systemd-run --user --no-ask-password --on-active=1m --timer-property=AccuracySec=1ms -- notify-send -u critical -t 0 "ploup"
 *)
 
-open Cmdliner
+let verbose =
+  let i = Arg.info ~doc:"Enable verbose messages." ["v";"verbose"] in
+  Arg.(value & flag i)
 
-let common_opts = Term.(pure ())
+type options = {
+  verbose : bool ;
+}
+
+let common_opts =
+  let f verbose = {
+    verbose ;
+  }
+  in
+  Term.(pure f $ verbose)
 
 let message =
   let i = Arg.info ~docv:"MSG" ~doc:"Description of the alert." [] in
@@ -14,17 +26,39 @@ let message =
 let lwt_ret f =
   Term.(ret (pure Lwt_main.run $ f))
 
+let alert_command =
+  let i =
+    Term.info ~doc:"Launch an alert later." "alert"
+  in
+  let f opts delay s =
+    begin
+      if opts.verbose then
+        let {Delay.start;stop} = delay in
+        let pp =
+          Cmdliner.Arg.(conv_printer @@ pair Delay.Arg.rfc3339 Delay.Arg.rfc3339)
+        in
+        Fmt.pr "Delay: %a@." pp (start,stop)
+    end;
+    let n = Notif.make delay s in
+    Delay_sleep.launch n >|= fun () ->
+    `Ok ()
+  in
+  let cmd =
+    Term.(lwt_ret (pure f $ common_opts $ Delay.term_duration 0 $ message))
+  in
+  cmd, i
+
 let ding_command =
   let i =
     Term.info ~doc:"Launch an alert immediatly." "ding"
   in 
-  let f orig s =
-    let n = Notif.make orig s in
-    Notif.notif n >>= fun _ ->
-    Lwt.return (`Ok ())
+  let f delay s =
+    let n = Notif.make delay s in
+    Notif.notif n >|= fun _ ->
+    `Ok ()
   in
   let cmd =
-    Term.(lwt_ret (pure f $ Delay.term $ message))
+    Term.(lwt_ret (pure f $ Delay.term_raw $ message))
   in
   cmd, i
 
@@ -37,8 +71,9 @@ let default =
   in
   cmd, i
 
-let cmds = [ ding_command ]
+let cmds = [ ding_command; alert_command ]
 
 let () =
+  CalendarLib.Time_Zone.change UTC;
   match Term.eval_choice default cmds with
   | r -> Term.exit r

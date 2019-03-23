@@ -7,7 +7,7 @@ type t = {
   orig : Delay.t ;
 }
 
-let make ?(icon="clock") ?(timeout=0) orig message =
+let make ?(icon="appointment-soon") ?(timeout=0) orig message =
   { icon ; timeout ; message ; orig}
 
 let notif { icon ; message ; timeout ; orig } =
