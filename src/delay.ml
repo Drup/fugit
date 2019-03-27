@@ -120,15 +120,17 @@ let pp_period ppf p =
   let condfmt ppf (i,fmt,fmts) =
     if i > 1 then Fmt.pf ppf fmts i
     else if i = 1 then Fmt.pf ppf fmt
-    else ()
+    else assert false
   in
-  let rec pp_list ppf l = match l with
+  let pp_list ppf l =
+    let l = CCList.filter (fun (i,_,_) -> i <> 0) l in
+    match List.rev l with
     | [] -> ()
-    | [b] ->
-      Fmt.pf ppf "%a" condfmt b
-    | (0, _, _) :: l -> pp_list ppf l
+    | [b] -> Fmt.pf ppf "%a" condfmt b
     | b :: l ->
-      Fmt.pf ppf "%a, %a" condfmt b pp_list l
+      Fmt.pf ppf "%a and %a"
+        Fmt.(list ~sep:comma condfmt) (List.rev l)
+        condfmt b
   in
   Fmt.(pf ppf "@[%a@]" pp_list)
     [ years, "1 year", "%i years";
@@ -168,45 +170,46 @@ module Parsing = struct
     let x = CCChar.lowercase_ascii i and y = CCChar.uppercase_ascii i in
     satisfy (fun c -> c = x || x = y)
 
-  let digits n =
-    assert (n < Sys.word_size) ;
-    let i = ref 0 in
-    let is_digit = function '0'..'9' -> true | _ -> false in
-    let f c = incr i ; !i < n && is_digit c in
-    int_of_string <$> take_while f
+  let digits =
+    let f i =
+      match int_of_string i with
+      | v -> return v
+      | exception _ -> fail @@ Fmt.strf "Not a valid integer: %s" i
+    in
+    (take_while1 CCParse.is_num >>= f) <?> "Integer"
 
   let iso8601_duration =
-    let elem n c =
-      option None (digits n <** char_ci c >>| fun x -> Some x)
+    let elem c =
+      option None (digits <** char_ci c >>| fun x -> Some x)
     in
     let date =
       let f year month day (hour, minute, second) =
         C.Period.lmake ?year ?month ?day ?hour ?minute ?second () in
-      lift3 f (elem 4 'Y') (elem 2 'M') (elem 2 'D')
+      lift3 f (elem 'Y') (elem 'M') (elem 'D')
     in
     let time =
-      lift3 (fun a b c -> a,b,c) (elem 4 'H') (elem 2 'M') (elem 2 'S')
+      lift3 (fun a b c -> a,b,c) (elem 'H') (elem 'M') (elem 'S')
     in
     char_ci 'P' **>
     date <**>
     option (None,None,None) (char_ci 'T' **> time)
 
   let human_duration =
-    let elem n l =
+    let elem l =
       let l = List.sort CCOrd.(opp string) l in
       option None
-        (digits n <** choice (List.map string_ci l) >>| fun x -> Some x)
+        (digits <** choice (List.map string_ci l) >>| fun x -> Some x)
     in
     let f year month day hour minute second =
       C.Period.lmake ?year ?month ?day ?hour ?minute ?second ()
     in
     lift4 f
-      (elem 4 ["y";"year";"years"])
-      (elem 2 ["month";"months"])
-      (elem 2 ["d";"day";"days"])
-      (elem 4 ["h";"hour";"hours"])
-      <**> (elem 2 ["m";"min";"mins";"minute";"minutes"])
-      <**> (elem 2 ["s";"sec";"secs";"second";"seconds"])
+      (elem ["y";"year";"years"])
+      (elem ["month";"months"])
+      (elem ["d";"day";"days"])
+      (elem ["h";"hour";"hours"])
+      <**> (elem ["m";"min";"mins";"minute";"minutes"])
+      <**> (elem ["s";"sec";"secs";"second";"seconds"])
 
   let duration =
     (iso8601_duration <?> "invalid ISO8601 duration")
