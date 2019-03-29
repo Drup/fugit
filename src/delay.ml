@@ -1,14 +1,18 @@
 module C = CalendarLib.Calendar.Precise
 
+type duration = C.Period.t
+
 type t = {
   start : C.t ;
   stop : C.t ;
 }
 
-let of_period p =
+let of_duration p =
   let start = C.now () in
   let stop = C.add start p in
   { start ; stop }
+
+let duration p = C.sub p.stop p.start
 
 let calendar_pp_with fmt ppf d =
   let open CalendarLib in
@@ -110,7 +114,7 @@ let format_now = function
   | Unknown
     -> "<b>%A</b> <b>%dth</b> <b>%B</b> <b>%Y</b> at <b>%R</b>"
 
-let pp_period ppf p =
+let pp_duration ppf p =
   let years, months, days, seconds = C.Period.ymds p in
   let hours, minutes, seconds =
     let m = seconds / 60 in
@@ -141,19 +145,19 @@ let pp_period ppf p =
       seconds, "1 second", "%i seconds";
     ]
 
-let pp_explain ppf { start ; stop } =
-  let precision = decide_precision start in
-  let length = C.sub stop start in
+let pp_explain ppf d =
+  let precision = decide_precision d.start in
+  let duration = duration d in
   Fmt.pf ppf "It is %a.\n"
     (calendar_pp_with @@ format_now precision)
     (C.now ()) ;
   if precision = Hour then
     Fmt.pf ppf "Alert started %a ago."
-      pp_period length
+      pp_duration duration
   else
     Fmt.pf ppf "Alert started %a.\n%a ago."
-      (calendar_pp_with @@ format_start precision) start
-      pp_period length
+      (calendar_pp_with @@ format_start precision) d.start
+      pp_duration duration
 
 (** Parsing *)
 

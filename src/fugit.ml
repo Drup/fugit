@@ -50,7 +50,7 @@ let parse_delay opts l =
   | Some d, [] ->
     Lwt_result.return d
   | None, l ->
-    Lwt_result.lift (Delay.parse l) >|= Delay.of_period
+    Lwt_result.lift (Delay.parse l) >|= Delay.of_duration
 
 let alert_command opts delay message =
   begin

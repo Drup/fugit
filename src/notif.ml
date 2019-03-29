@@ -1,17 +1,19 @@
 module ONotif = Notification
 
+type icon = string
+
 type t = {
-  icon : string ;
+  icon : icon ;
   message : string ;
   timeout : int ;
-  orig : Delay.t ;
+  delay : Delay.t ;
 }
 
-let make ?(icon="appointment-soon") ?(timeout=0) orig message =
-  { icon ; timeout ; message ; orig}
+let make ?(icon="appointment-soon") ?(timeout=0) delay message =
+  { icon ; timeout ; message ; delay}
 
-let notif { icon ; message ; timeout ; orig } =
-  let body = Fmt.strf "%a" Delay.pp_explain orig in
+let notif { icon ; message ; timeout ; delay } =
+  let body = Fmt.strf "%a" Delay.pp_explain delay in
   ONotif.notify
     ~app_name:"fugit"
     ~icon

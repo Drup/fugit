@@ -1,7 +1,7 @@
 
 module Period = struct
   type t = CalendarLib.Calendar.Precise.Period.t
-  let pp = Delay.pp_period
+  let pp = Delay.pp_duration
   let equal = CalendarLib.Calendar.Precise.Period.equal
 end
 let period : Period.t Alcotest.testable = (module Period)
