@@ -13,6 +13,7 @@ depends: [
   "containers" "cmdliner"
   "calendar"
   "angstrom"
+  "alcotest" {with-test}
 ]
 build: [
   ["dune" "subst"] {pinned}

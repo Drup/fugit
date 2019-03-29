@@ -1,0 +1,4 @@
+(tests
+ (names unittest)
+ (libraries fugit alcotest)
+)

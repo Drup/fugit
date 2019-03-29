@@ -160,15 +160,9 @@ let pp_explain ppf { start ; stop } =
 module Parsing = struct
   open Angstrom
 
-  let white = satisfy CCParse.is_white
-
-  let ( <** ) a b = a <* skip_while CCParse.is_white *> b
-  let ( **> ) a b = a *> skip_while CCParse.is_white *> b
-  let ( <**> ) a b = a <*> (skip_while CCParse.is_white *> b)
-
   let char_ci i =
     let x = CCChar.lowercase_ascii i and y = CCChar.uppercase_ascii i in
-    satisfy (fun c -> c = x || x = y)
+    satisfy (fun c -> c = x || c = y)
 
   let digits =
     let f i =
@@ -180,7 +174,7 @@ module Parsing = struct
 
   let iso8601_duration =
     let elem c =
-      option None (digits <** char_ci c >>| fun x -> Some x)
+      option None (digits <* char_ci c >>| fun x -> Some x)
     in
     let date =
       let f year month day (hour, minute, second) =
@@ -190,10 +184,23 @@ module Parsing = struct
     let time =
       lift3 (fun a b c -> a,b,c) (elem 'H') (elem 'M') (elem 'S')
     in
-    char_ci 'P' **>
-    date <**>
-    option (None,None,None) (char_ci 'T' **> time)
+    char_ci 'P' *>
+    date <*>
+    option (None,None,None) (char_ci 'T' *> time)
 
+
+  let white = skip_while CCParse.is_white
+  let skip =
+    white *> (
+      string_ci "and" <* white <|>
+      string_ci "," <* white <|>
+      return ""
+    ) 
+
+  let ( <** ) a b = a <* skip *> b
+  let ( **> ) a b = a *> skip *> b
+  let ( <**> ) a b = a <*> (skip *> b)
+  
   let human_duration =
     let elem l =
       let l = List.sort CCOrd.(opp string) l in

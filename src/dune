@@ -1,9 +1,17 @@
-(executable
+(library
  (name fugit)
- (public_name fugit)
+ (wrapped false)
+ (modules :standard \ Fugit)
  (libraries
    lwt.unix fmt obus.notification
    containers cmdliner calendar
    angstrom
   )
+)
+
+(executable
+ (name fugit)
+ (public_name fugit)
+ (modules Fugit)
+ (libraries fugit)
 )
