@@ -202,21 +202,28 @@ module Parsing = struct
   let ( <**> ) a b = a <*> (skip *> b)
   
   let human_duration =
-    let elem l =
-      let l = List.sort CCOrd.(opp string) l in
-      option None
-        (digits <** choice (List.map string_ci l) >>| fun x -> Some x)
+    let unit f l =
+      let l = List.sort CCOrd.(opp string) l in 
+      choice (List.map string_ci l) *> return f
     in
-    let f year month day hour minute second =
-      C.Period.lmake ?year ?month ?day ?hour ?minute ?second ()
+    let units = [
+      unit C.Period.year ["y";"year";"years"];
+      unit C.Period.month ["month";"months"];
+      unit C.Period.day ["d";"day";"days"];
+      unit C.Period.hour ["h";"hour";"hours"];
+      unit C.Period.minute ["m";"min";"mins";"minute";"minutes"];
+      unit C.Period.second ["s";"sec";"secs";"second";"seconds"];
+    ]
+    in 
+    let elem =
+      lift2 (|>)
+        (digits <* white)
+        (choice ~failure_msg:"Unknown time unit" units)
     in
-    lift4 f
-      (elem ["y";"year";"years"])
-      (elem ["month";"months"])
-      (elem ["d";"day";"days"])
-      (elem ["h";"hour";"hours"])
-      <**> (elem ["m";"min";"mins";"minute";"minutes"])
-      <**> (elem ["s";"sec";"secs";"second";"seconds"])
+    let elems =
+      sep_by1 skip elem
+    in
+    List.fold_left C.Period.add C.Period.empty <$> elems
 
   let duration =
     (iso8601_duration <?> "invalid ISO8601 duration")

@@ -20,6 +20,8 @@ let periods =
     f "75min" "PT1H15M";
     f "1 year and 2 mins" "P1YT2M";
     f "2month, 3day 23 min" "P2M3DT23M";
+    f "1s and 2mins" "PT2M1S";
+    f "3 days, 2h and 1 year" "P1Y3DT2H";
   ]
 
 
