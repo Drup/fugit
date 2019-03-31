@@ -237,13 +237,25 @@ module Parsing = struct
     (string_ci "in" *> skip_many1 white *> commit *> duration) <|>
     duration
 
-  let go l =
+  let interp_error x = 
     let map_error s =
       Fmt.strf "Unrecognized duration: %s" s
     in
-    let s = String.concat " " l in
-    let r = Angstrom.parse_string (parser <** end_of_input) s in
-    CCResult.map_err map_error r
+    CCResult.map_err map_error x
+
+  let parse_duration s =
+    Angstrom.parse_string (parser <** end_of_input) s
+    
 end
 
-let parse = Parsing.go
+let parse_duration s =
+  Parsing.(interp_error @@ parse_duration s)
+
+let parse_durationl l =
+  let s = String.concat " " l in
+  parse_duration s
+
+let parse l = 
+  let s = String.concat " " l in
+  Parsing.(interp_error @@ CCResult.map of_duration @@ parse_duration s)
+

@@ -5,7 +5,7 @@
  (libraries
    lwt.unix fmt obus.notification
    containers cmdliner calendar
-   angstrom
+   angstrom toml bos
   )
 )
 
