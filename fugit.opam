@@ -9,7 +9,7 @@ bug-reports: "https://github.com/Drup/fugit/issues"
 depends: [
   "ocaml" {>= "4.04"}
   "dune" {build}
-  "lwt" "fmt" "obus"
+  "lwt" "fmt" "obus" "bos"
   "containers" "cmdliner"
   "calendar"
   "angstrom"
