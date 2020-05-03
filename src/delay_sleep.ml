@@ -12,6 +12,8 @@ let wait (n : Notif.t) =
 let launch n =
   match Lwt_unix.fork () with
   | 0 ->
-    if Lwt_unix.fork () = 0 then Lwt_main.run @@ wait n ;
-    exit 0
+    if Lwt_unix.fork () = 0 then
+      wait n
+    else
+      Lwt.return_unit
   | _ -> Lwt.return_unit
