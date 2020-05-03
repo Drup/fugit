@@ -7,7 +7,9 @@ end
 let period : Period.t Alcotest.testable = (module Period)
 
 let periods =
-  let parse p s = Angstrom.(parse_string (p <* end_of_input)) s in
+  let parse p s =
+    Angstrom.(parse_string ~consume:Consume.All (p <* end_of_input)) s
+  in
   let f s d =
     let open Alcotest in
     test_case d `Quick @@ fun () ->

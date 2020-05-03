@@ -244,7 +244,7 @@ module Parsing = struct
     CCResult.map_err map_error x
 
   let parse_duration s =
-    Angstrom.parse_string (parser <** end_of_input) s
+    Angstrom.parse_string ~consume:Consume.All (parser <** end_of_input) s
     
 end
 
