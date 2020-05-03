@@ -118,8 +118,8 @@ let pp_duration ppf p =
   let years, months, days, seconds = C.Period.ymds p in
   let hours, minutes, seconds =
     let m = seconds / 60 in
-    let h = m / 24 in
-    h, m - 24*h, seconds - m*60
+    let h = m / 60 in
+    h, m - 60*h, seconds - m*60
   in
   let condfmt ppf (i,fmt,fmts) =
     if i > 1 then Fmt.pf ppf fmts i
@@ -148,9 +148,10 @@ let pp_duration ppf p =
 let pp_explain ppf d =
   let precision = decide_precision d.start in
   let duration = duration d in
+  let c_now = C.convert (C.now ()) UTC Local in
   Fmt.pf ppf "It is %a.\n"
     (calendar_pp_with @@ format_now precision)
-    (C.now ()) ;
+    c_now ;
   if precision = Hour then
     Fmt.pf ppf "Alert started %a ago."
       pp_duration duration
