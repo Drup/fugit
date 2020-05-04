@@ -9,52 +9,64 @@ type record = {
 }
 let mk_record ?duration ?icon message =
   { message ; duration ; icon }
+let pp_record ppf { message ; duration ; icon } =
+  let once fmt f ppf x = Fmt.pf ppf fmt f x in
+  Fmt.pf ppf "@[<v>message: %s@,%a%a@]"
+    message
+    (Fmt.option @@ once "duration: %a@." Delay.pp_duration) duration
+    (Fmt.option @@ once "icon: %a@." Fmt.string) icon
 
 type config = {
   records : record NameTbl.t
 }
 
 module Format = struct
-  module T = TomlLenses
-  let (|--) = T.(|--)
+  module T = Lenses
+  open T
 
-  let message = T.string
+  let message =
+    (fun x -> x.message) >$<
+    (T.key "message" |-- T.string)
   let duration =
+    let create v = Fmt.strf "%a" Delay.pp_duration v in
     let get x = CCResult.to_opt @@ Delay.parse_duration x in
-    let set v _ = Some (Fmt.strf "%a" Delay.pp_duration v) in
-    T.string |-- { get ; set }
-  let icon = T.string
+    let set v _ = create v in
+    (fun x -> x.duration) >$<
+    T.optional "duration" (T.string |-- {T. create ; get ; set })
+  let icon =
+    (fun x -> x.icon) >$<
+    T.optional "icon" T.string
 
   let record =
-    let get a =
-      let message = T.get a message
-      and icon = T.get a icon
-      and duration = T.get a duration in
-      CCOpt.map (mk_record ?icon ?duration) message
-    and set a _ =
-      let open CCOpt.Infix in
-      let t = TomlTypes.(TTable Table.empty) in
-      T.set a.message t message >>= fun t ->
-      CCOpt.flat_map (fun d -> T.set d t duration) a.duration >>= fun t ->
-      CCOpt.flat_map (fun i -> T.set i t icon) a.icon >>= fun t ->
-      Some t
-    in
-    {T. get ; set}
+    let f icon duration message = mk_record ?icon ?duration message in
+    f <$> icon <*> duration <*> message
 
-  let get_record r c =
-    T.get c (T.field "alerts" |-- T.key r |-- record)
-  let add_record r o c =
-    T.set o c (T.field "alerts" |-- T.key r |-- record)
-    |> CCOpt.get_exn
+  let alerts = T.field "alerts"
+
+  let entry r =
+    alerts |-- T.field r |-- record
+
+  let get_entry r c =
+    T.get c (entry r)
+  let get_all_entry c =
+    let tbl =
+      CCOpt.get_or ~default:TomlTypes.Table.empty @@
+      T.get c @@ T.field "alerts"
+    in
+    let f (n,c) = TomlTypes.Table.Key.to_string n, T.get c (T.table |-- record) in
+    List.map f @@ TomlTypes.Table.bindings tbl
+
+  let add_entry r o c =
+    T.set o c (entry r)
 
   let parse_file =
     Lwt_preemptive.detach Toml.Parser.from_filename
 
-  let read f filename =
+  let read ~default f filename =
     let filename = Fpath.to_string filename in
     let open Lwt.Infix in
     Lwt_unix.file_exists filename >>= function
-    | false -> Lwt_result.return None
+    | false -> Lwt_result.return default
     | true ->
       parse_file filename >>= function
       | `Ok x -> Lwt_result.return (f x)
@@ -103,15 +115,27 @@ let mk filename =
   }
 (* let get t = Lazy.force t.config *)
 
-let get_record t name =
+let read ~default f t =
   match t.filename with
-  | None -> Lwt_result.return None
-  | Some f -> Format.(read (get_record name)) f
-let add_record t name r =
+  | None -> Lwt_result.return default
+  | Some file -> Format.read ~default f file
+
+let get_entry t name =
+  read ~default:None (Format.get_entry name) t
+
+let get_all_entry t =
+  read ~default:[] Format.get_all_entry t
+
+let pp_entries =
+  let pp_entry ppf (n,c) =
+    Fmt.pf ppf "@[<v2>%s:@,%a@]" n (Fmt.option pp_record) c
+  in
+  Fmt.vbox @@ Fmt.list ~sep:Fmt.cut pp_entry
+
+let add_entry t name r =
   match t.filename with
   | None -> Lwt_result.fail "Can't find the configuration file."
-  | Some f -> Format.(update (add_record name r)) f
-
+  | Some f -> Format.(update (add_entry name r)) f
 
 let default_file =
   let open CCOpt.Infix in

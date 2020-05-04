@@ -19,7 +19,7 @@ let lwt_ret f =
 
 let does_systemd_run_exists =
   CCResult.get_or ~default:false @@
-  Bos.OS.Cmd.exists (Bos.Cmd.v "systemd-run") 
+  Bos.OS.Cmd.exists (Bos.Cmd.v "systemd-run")
 
 type backend = Sleep | Systemd | Auto
 type options = {
@@ -133,12 +133,16 @@ type action =
   | Ding
   | Record
   | Other of string
+  | List
+  | Show
 
 let action_arg =
   let sl = [
     "notif", Notif ;
     "ding", Ding ;
     "record", Record ;
+    "list", List ;
+    "show", Show ;
   ]
   in
   let e = Arg.enum sl in
@@ -155,7 +159,7 @@ let main opts action args =
   | Notif, m :: l
   | Other m, l ->
     to_ret @@ begin
-      Config.get_record opts.config m >>= fun record ->
+      Config.get_entry opts.config m >>= fun record ->
       begin match record with
         | Some {Config. message ; duration ; icon} ->
           let predef = CCOpt.map Delay.of_duration duration in
@@ -168,18 +172,36 @@ let main opts action args =
       parse_delay ?predef_delay opts l >>= fun delay ->
       alert_command opts icon delay message
     end
+  | Show, [m] ->
+    to_ret @@ begin
+      Config.get_entry opts.config m >>= fun record ->
+      begin match record with
+        | Some record ->
+          Fmt.pr "%a@." Config.pp_record record;
+          Lwt_result.return ()
+        | None ->
+          Lwt_result.fail @@
+          Fmt.strf "I don't know anything about %s@." m
+      end
+    end
   | Record, m :: l ->
     to_ret @@ begin
       may_parse_duration opts l >>= fun duration ->
       let icon = None in
       let r = Config.mk_record ?duration ?icon m in
-      Config.add_record opts.config m r
+      Config.add_entry opts.config m r
     end
   | Ding, m :: l ->
     let u =
       parse_delay opts l >>= fun delay ->
       ding_command opts delay m in
     to_ret u
+  | List, [] ->
+    to_ret @@ begin
+      Config.get_all_entry opts.config >>= fun l ->
+      Fmt.pr "%a@." Config.pp_entries l;
+      Lwt.return_ok ()
+    end
   | _ ->
     Lwt.return @@ `Error (true, "Invalid command")
 
