@@ -169,17 +169,18 @@ module Parsing = struct
     let x = CCChar.lowercase_ascii i and y = CCChar.uppercase_ascii i in
     satisfy (fun c -> c = x || c = y)
 
-  let digits =
+  let digit =
     let f i =
       match int_of_string i with
       | v -> return v
       | exception _ -> fail @@ Fmt.strf "Not a valid integer: %s" i
     in
-    (take_while1 CCParse.is_num >>= f) <?> "Integer"
+    let b = function '0'..'9' -> true | _ -> false in
+    (take_while1 b >>= f) <?> "Integer"
 
   let iso8601_duration =
     let elem c =
-      option None (digits <* char_ci c >>| fun x -> Some x)
+      option None (digit <* char_ci c >>| fun x -> Some x)
     in
     let date =
       let f year month day (hour, minute, second) =
@@ -200,30 +201,82 @@ module Parsing = struct
       string_ci "and" <* white <|>
       string_ci "," <* white <|>
       return ""
-    ) 
+    )
 
   let ( <** ) a b = a <* skip *> b
   let ( **> ) a b = a *> skip *> b
   let ( <**> ) a b = a <*> (skip *> b)
-  
+
+  module ElemPeriod = struct
+    open CCFun
+
+    type t = Int of int | Float of float
+    let elem =
+      let mk s =
+        if CCString.for_all CCParse.is_num s
+        then return @@ Int (int_of_string s)
+        else
+          match float_of_string s with
+          | v -> return (Float v)
+          | exception _ ->
+            fail @@ Fmt.strf "I don't understand the time period \"%s\"." s
+      in
+      let b = function '0'..'9'|'.' -> true | _ -> false in
+      (take_while1 b >>= mk) <?> "Period"
+
+    let splitF f =
+      let int_part = floor f in
+      let frac_part = f -. int_part in
+      int_of_float int_part, frac_part
+    let elemF to_period factor k f =
+      let quant, rest = splitF f in
+      C.Period.add (to_period quant) @@ k (rest *. factor)
+
+    let mk i f = function Int x -> i x | Float x -> f x
+    let (!!) f x = return @@ f x
+
+    let onlyI i s = mk !!i (fun _ -> fail s)
+    let year =
+      onlyI C.Period.year "I cannot compute a fractional year precisely."
+    let month =
+      onlyI C.Period.month "I cannot compute a fractional month precisely."
+    let day =
+      mk !!C.Period.day
+        !!(elemF C.Period.day 24. @@
+           elemF C.Period.hour 60. @@
+           elemF C.Period.minute 60. @@
+           int_of_float %> C.Period.second)
+    let hour =
+      mk !!C.Period.hour
+        !!(elemF C.Period.hour 60. @@
+           elemF C.Period.minute 60. @@
+           int_of_float %> C.Period.second)
+    let minute =
+      mk !!C.Period.minute
+        !!(elemF C.Period.minute 60. @@
+           int_of_float %> C.Period.second)
+    let second =
+      mk !!C.Period.second !!(int_of_float %> C.Period.second)
+  end
+  open ElemPeriod
+
   let human_duration =
     let unit f l =
-      let l = List.sort CCOrd.(opp string) l in 
-      choice (List.map string_ci l) *> return f
+      let l = List.sort CCOrd.(opp string) l in
+      (ElemPeriod.elem <* white <* choice (List.map string_ci l) <* commit)
+      >>= f
     in
     let units = [
-      unit C.Period.year ["y";"year";"years"];
-      unit C.Period.month ["month";"months"];
-      unit C.Period.day ["d";"day";"days"];
-      unit C.Period.hour ["h";"hour";"hours"];
-      unit C.Period.minute ["m";"min";"mins";"minute";"minutes"];
-      unit C.Period.second ["s";"sec";"secs";"second";"seconds"];
+      unit year ["y";"year";"years"];
+      unit month ["month";"months"];
+      unit day ["d";"day";"days"];
+      unit hour ["h";"hour";"hours"];
+      unit minute ["m";"min";"mins";"minute";"minutes"];
+      unit second ["s";"sec";"secs";"second";"seconds"];
     ]
-    in 
+    in
     let elem =
-      lift2 (|>)
-        (digits <* white)
-        (choice ~failure_msg:"Unknown time unit" units)
+      choice ~failure_msg:"I do not recognize this time unit" units
     in
     let elems =
       sep_by1 skip elem
@@ -231,32 +284,26 @@ module Parsing = struct
     List.fold_left C.Period.add C.Period.empty <$> elems
 
   let duration =
-    (iso8601_duration <?> "invalid ISO8601 duration")
-    <|> (human_duration <?> "invalid duration")
+    (iso8601_duration <?> "I do not understand this ISO8601 duration")
+    <|> (human_duration <?> "I do not understand this duration")
 
   let parser =
-    (string_ci "in" *> skip_many1 white *> commit *> duration) <|>
+    (string_ci "in" *> white *> commit *> duration) <|>
     duration
 
-  let interp_error x = 
-    let map_error s =
-      Fmt.strf "Unrecognized duration: %s" s
-    in
-    CCResult.map_err map_error x
-
   let parse_duration s =
-    Angstrom.parse_string ~consume:Consume.All (parser <** end_of_input) s
-    
+    Angstrom.parse_string ~consume:Consume.All
+      (parser <** end_of_input) s
+
 end
 
 let parse_duration s =
-  Parsing.(interp_error @@ parse_duration s)
+  Parsing.parse_duration s
 
 let parse_durationl l =
   let s = String.concat " " l in
   parse_duration s
 
-let parse l = 
+let parse l =
   let s = String.concat " " l in
-  Parsing.(interp_error @@ CCResult.map of_duration @@ parse_duration s)
-
+  Parsing.(CCResult.map of_duration @@ parse_duration s)
