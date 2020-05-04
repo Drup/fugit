@@ -17,6 +17,10 @@ let lwt_ret f =
 
 (** Common options *)
 
+let does_systemd_run_exists =
+  CCResult.get_or ~default:false @@
+  Bos.OS.Cmd.exists (Bos.Cmd.v "systemd-run") 
+
 type backend = Sleep | Systemd | Auto
 type options = {
   verbose : bool ;
@@ -95,6 +99,8 @@ let launch_delay { verbose; no_action; backend; _ } (n : Notif.t) =
     match backend with
     | Sleep -> Delay_sleep.launch
     | Systemd -> Delay_systemd.launch
+    | Auto when not does_systemd_run_exists ->
+      Delay_sleep.launch
     | Auto ->
       if prec <= Hour then
         Delay_sleep.launch
