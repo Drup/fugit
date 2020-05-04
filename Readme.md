@@ -30,7 +30,7 @@ duration: 3 minutes and 30 seconds
 
 % fugit tea
 Alert will trigger in 3 minutes and 30 seconds.
-``
+```
 
 It has a nice editable configuration file under `$HOME/.config/fugit/config`.
 
