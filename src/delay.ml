@@ -69,9 +69,9 @@ type precision =
   | Year
   | Unknown
 
-let decide_precision c =
-  let c = C.convert c UTC Local in
-  let c_now = C.convert (C.now ()) UTC Local in
+let decide_precision start stop =
+  let c = C.convert start UTC Local in
+  let c_now = C.convert stop UTC Local in
   let date = C.to_date c and date_now = C.to_date c_now in
   if C.Date.equal date date_now then
     begin if C.hour c = C.hour c_now then
@@ -145,10 +145,13 @@ let pp_duration ppf p =
       seconds, "1 second", "%i seconds";
     ]
 
+let pp_short ppf d =
+  pp_duration ppf @@ duration d
+
 let pp_explain ppf d =
-  let precision = decide_precision d.start in
+  let c_now = C.now () in
+  let precision = decide_precision d.start c_now in
   let duration = duration d in
-  let c_now = C.convert (C.now ()) UTC Local in
   Fmt.pf ppf "It is %a.\n"
     (calendar_pp_with @@ format_now precision)
     c_now ;

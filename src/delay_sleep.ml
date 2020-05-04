@@ -1,19 +1,22 @@
 open Lwt.Infix
 module P = CalendarLib.Calendar.Precise
 
-let wait (n : Notif.t) =
+let wait ~no_action ~verbose (n : Notif.t) =
   let duration = Delay.duration n.delay in
   let s = P.Time.Period.to_seconds @@ P.Period.safe_to_time duration in
-  Fmt.pr "Alert will trigger in %a.@." Delay.pp_duration duration;
-  Lwt_unix.sleep (float s) >>= fun () ->
-  Notif.notif n >>= fun _ ->
-  Lwt.return_unit
+  if verbose then Fmt.pr "Sleeping for %i secondes.@." s;
+  if no_action then Lwt.return_ok ()
+  else begin
+    Lwt_unix.sleep (float s) >>= fun () ->
+    Notif.notif n >>= fun _ ->
+    Lwt.return_ok ()
+  end
 
-let launch n =
+let launch ~no_action ~verbose n =
   match Lwt_unix.fork () with
   | 0 ->
     if Lwt_unix.fork () = 0 then
-      wait n
+      wait ~no_action ~verbose n
     else
-      Lwt.return_unit
-  | _ -> Lwt.return_unit
+      Lwt.return_ok ()
+  | _ -> Lwt.return_ok ()

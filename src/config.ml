@@ -26,7 +26,7 @@ module Format = struct
   let icon = T.string
 
   let record =
-    let get a = 
+    let get a =
       let message = T.get a message
       and icon = T.get a icon
       and duration = T.get a duration in
@@ -42,14 +42,14 @@ module Format = struct
     {T. get ; set}
 
   let get_record r c =
-    T.get c (T.field "alerts" |-- T.key r |-- record) 
+    T.get c (T.field "alerts" |-- T.key r |-- record)
   let add_record r o c =
     T.set o c (T.field "alerts" |-- T.key r |-- record)
     |> CCOpt.get_exn
 
   let parse_file =
     Lwt_preemptive.detach Toml.Parser.from_filename
-  
+
   let read f filename =
     let filename = Fpath.to_string filename in
     let open Lwt.Infix in
@@ -131,5 +131,3 @@ let term =
     Arg.(value & opt (some file_conv) default_file i)
   in
   Term.(term_result (pure mk $ arg))
-  
-
