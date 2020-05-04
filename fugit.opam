@@ -12,7 +12,7 @@ depends: [
   "lwt" "fmt" "obus" "bos"
   "containers" "cmdliner"
   "calendar"
-  "angstrom"
+  "angstrom" {>= "0.14.0"}
   "alcotest" {with-test}
 ]
 build: [
