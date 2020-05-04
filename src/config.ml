@@ -47,7 +47,7 @@ module Format = struct
     alerts |-- T.field r |-- record
 
   let get_entry r c =
-    T.get c (entry r)
+    try T.get c (entry r) with TomlTypes.Table.Key.Bad_key _ -> None
   let get_all_entry c =
     let tbl =
       CCOpt.get_or ~default:TomlTypes.Table.empty @@
