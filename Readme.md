@@ -32,6 +32,8 @@ duration: 3 minutes and 30 seconds
 Alert will trigger in 3 minutes and 30 seconds.
 ``
 
+It has a nice editable configuration file under `$HOME/.config/fugit/config`.
+
 ## Compatibility
 
 It might work under my linux setup. It probably doesn't work anywhere else.
