@@ -1,9 +1,6 @@
 open Lwt_result.Infix
 open Cmdliner
 
-(* systemd-run --user --no-ask-password --on-active=1m --timer-property=AccuracySec=1ms -- notify-send -u critical -t 0 "ploup"
-*)
-
 (** Utility functions *)
 
 let to_ret ?(usage=false) =
