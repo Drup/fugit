@@ -372,10 +372,7 @@ let parse_deadlinel l =
 
 let parse_deadline s =
   let l = String.split_on_char ' ' s in
-  match parse_durationl' l with
-  | Ok x -> Ok x
-  | Error _ ->
-    parse_time_pointl' l
+  parse_deadlinel l
 
 let parse l =
   let s = String.concat " " l in
