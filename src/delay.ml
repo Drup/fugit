@@ -307,6 +307,77 @@ let parse_durationl l =
   let s = String.concat " " l in
   parse_duration s
 
+let duration_of_daypack_duration (x : Daypack_lib.Duration.t) : duration =
+  C.Period.lmake ~day:x.days ~hour:x.hours ~minute:x.minutes ~second:x.seconds ()
+
+let get_current_tz_offset_s () =
+  Ptime_clock.current_tz_offset_s () |> Option.get |> Option.some
+
+let search_param =
+  let open Daypack_lib in
+  Time_pattern.Years_ahead_start_unix_second {
+    search_using_tz_offset_s = get_current_tz_offset_s ();
+    start = Time.Current.cur_unix_second ();
+    search_years_ahead = 5;
+  }
+
+let parse_durationl' l =
+  let s = String.concat " " l in
+  Daypack_lib.Duration.Of_string.of_string s
+  |> Result.map duration_of_daypack_duration
+
+let parse_time_pointl' l =
+  let open Daypack_lib in
+  let s = String.concat " " l in
+  match Time_expr.Of_string.time_points_expr_of_string s with
+  | Ok x ->
+    (match Time_expr.Time_points_expr.next_match_unix_second search_param
+             x with
+    | Error msg -> Error msg
+    | Ok x ->
+      match x with
+      | None -> Error "Failed to find a matching time point"
+      | Some x ->
+        let cur = Time.Current.cur_unix_second () in
+        let diff = if x >= cur then Int64.sub x cur else 0L in
+        Duration.of_seconds diff
+        |> Result.get_ok
+        |> duration_of_daypack_duration
+        |> Result.ok
+    )
+  | Error s -> Error s
+
+let parse_deadlinel l =
+  match l with
+  | [] ->
+    Error "Empty expression"
+  | [_] -> (
+      match parse_durationl' l with
+      | Ok x -> Ok x
+      | Error _ ->
+        parse_time_pointl' l
+    )
+  | x :: xs -> (
+      if x = "in" then
+        parse_durationl' xs
+      else
+        if x = "at" then
+          parse_time_pointl' xs
+        else
+          match parse_durationl' l with
+          | Ok x -> Ok x
+          | Error _ ->
+            parse_time_pointl' l
+      )
+
+let parse_deadline s =
+  let l = String.split_on_char ' ' s in
+  match parse_durationl' l with
+  | Ok x -> Ok x
+  | Error _ ->
+    parse_time_pointl' l
+
 let parse l =
   let s = String.concat " " l in
-  Parsing.(CCResult.map of_duration @@ parse_duration s)
+  (* Parsing.(CCResult.map of_duration @@ parse_duration s) *)
+  CCResult.map of_duration @@ parse_deadline s

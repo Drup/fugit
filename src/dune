@@ -6,6 +6,8 @@
    lwt.unix fmt obus.notification
    containers cmdliner calendar
    angstrom toml bos
+   daypack-lib
+   ptime ptime.clock.os
   )
 )
 
