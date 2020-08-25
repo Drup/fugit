@@ -315,7 +315,7 @@ let get_current_tz_offset_s () =
 
 let search_param =
   let open Daypack_lib in
-  Time_pattern.Years_ahead_start_unix_second {
+  Search_param.Years_ahead_start_unix_second {
     search_using_tz_offset_s = get_current_tz_offset_s ();
     start = Time.Current.cur_unix_second ();
     search_years_ahead = 5;
@@ -323,23 +323,23 @@ let search_param =
 
 let parse_durationl' l =
   let s = String.concat " " l in
-  Daypack_lib.Duration.Of_string.of_string s
+  Daypack_lib.Duration.of_string s
   |> Result.map duration_of_daypack_duration
 
 let parse_time_pointl' l =
   let open Daypack_lib in
   let s = String.concat " " l in
-  match Time_expr.Of_string.time_points_expr_of_string s with
+  match Time_expr.of_string s with
   | Ok x ->
-    (match Time_expr.Time_points_expr.next_match_unix_second search_param
+    (match Time_expr.next_match_time_slot search_param
              x with
     | Error msg -> Error msg
     | Ok x ->
       match x with
       | None -> Error "Failed to find a matching time point"
-      | Some x ->
+      | Some (time_slot_start, _time_slot_end) ->
         let cur = Time.Current.cur_unix_second () in
-        let diff = if x >= cur then Int64.sub x cur else 0L in
+        let diff = if time_slot_start >= cur then Int64.sub time_slot_start cur else 0L in
         Duration.of_seconds diff
         |> Result.get_ok
         |> duration_of_daypack_duration
