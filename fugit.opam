@@ -15,6 +15,7 @@ depends: [
   "angstrom" {>= "0.14.0"}
   "alcotest" {with-test}
   "toml"
+  "daypack-lib" {= "0.0.1"}
 ]
 build: [
   ["dune" "subst"] {pinned}
