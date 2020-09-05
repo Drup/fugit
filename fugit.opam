@@ -16,7 +16,7 @@ depends: [
   "alcotest" {with-test}
   "toml"
   "ptime"
-  "daypack-lib" {= "0.0.2"}
+  "daypack-lib" {= "0.0.4"}
 ]
 build: [
   ["dune" "subst"] {pinned}
