@@ -11,8 +11,8 @@ let periods =
     let open Alcotest in
     test_case d `Quick @@ fun () ->
     check (result period string) d
+      (Delay.Iso8601.parse d)
       (Delay.parse_duration @@ String.split_on_char ' ' s)
-      (Delay.Iso8601.parse s)
   in
   "Periods", [
     f "1s" "PT1S";
