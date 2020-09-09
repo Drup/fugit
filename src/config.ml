@@ -29,7 +29,9 @@ module Format = struct
     (T.key "message" |-- T.string)
   let duration =
     let create v = Fmt.strf "%a" Delay.pp_duration v in
-    let get x = CCResult.to_opt @@ Delay.parse_duration x in
+    let get x =
+      CCResult.to_opt @@ Delay.parse_duration @@ String.split_on_char ' ' x
+    in
     let set v _ = create v in
     (fun x -> x.duration) >$<
     T.optional "duration" (T.string |-- {T. create ; get ; set })

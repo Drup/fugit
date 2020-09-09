@@ -88,7 +88,7 @@ let may_parse_duration opts l =
   | Some _d, [] ->
     Lwt_result.return None
   | None, l ->
-    Lwt_result.lift (Delay.parse_deadlinel l) >|= (fun x -> Some x)
+    Lwt_result.lift (Delay.parse_deadline l) >|= (fun x -> Some x)
 
 let launch_delay { verbose; no_action; backend; _ } (n : Notif.t) =
   let prec = Delay.decide_precision n.delay.start n.delay.stop in

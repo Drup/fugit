@@ -165,7 +165,8 @@ let pp_explain ppf d =
 
 (** Parsing *)
 
-module Parsing = struct
+
+module Iso8601 = struct
   open Angstrom
 
   let char_ci i =
@@ -181,7 +182,7 @@ module Parsing = struct
     let b = function '0'..'9' -> true | _ -> false in
     (take_while1 b >>= f) <?> "Integer"
 
-  let iso8601_duration =
+  let duration =
     let elem c =
       option None (digit <* char_ci c >>| fun x -> Some x)
     in
@@ -197,115 +198,9 @@ module Parsing = struct
     date <*>
     option (None,None,None) (char_ci 'T' *> time)
 
-
-  let white = skip_while CCParse.is_white
-  let skip =
-    white *> (
-      string_ci "and" <* white <|>
-      string_ci "," <* white <|>
-      return ""
-    )
-
-  let ( <** ) a b = a <* skip *> b
-  let ( **> ) a b = a *> skip *> b
-  let ( <**> ) a b = a <*> (skip *> b)
-
-  module ElemPeriod = struct
-    open CCFun
-
-    type t = Int of int | Float of float
-    let elem =
-      let mk s =
-        if CCString.for_all CCParse.is_num s
-        then return @@ Int (int_of_string s)
-        else
-          match float_of_string s with
-          | v -> return (Float v)
-          | exception _ ->
-            fail @@ Fmt.strf "I don't understand the time period \"%s\"." s
-      in
-      let b = function '0'..'9'|'.' -> true | _ -> false in
-      (take_while1 b >>= mk) <?> "Period"
-
-    let splitF f =
-      let int_part = floor f in
-      let frac_part = f -. int_part in
-      int_of_float int_part, frac_part
-    let elemF to_period factor k f =
-      let quant, rest = splitF f in
-      C.Period.add (to_period quant) @@ k (rest *. factor)
-
-    let mk i f = function Int x -> i x | Float x -> f x
-    let (!!) f x = return @@ f x
-
-    let onlyI i s = mk !!i (fun _ -> fail s)
-    let year =
-      onlyI C.Period.year "I cannot compute a fractional year precisely."
-    let month =
-      onlyI C.Period.month "I cannot compute a fractional month precisely."
-    let day =
-      mk !!C.Period.day
-        !!(elemF C.Period.day 24. @@
-           elemF C.Period.hour 60. @@
-           elemF C.Period.minute 60. @@
-           int_of_float %> C.Period.second)
-    let hour =
-      mk !!C.Period.hour
-        !!(elemF C.Period.hour 60. @@
-           elemF C.Period.minute 60. @@
-           int_of_float %> C.Period.second)
-    let minute =
-      mk !!C.Period.minute
-        !!(elemF C.Period.minute 60. @@
-           int_of_float %> C.Period.second)
-    let second =
-      mk !!C.Period.second !!(int_of_float %> C.Period.second)
-  end
-  open ElemPeriod
-
-  let human_duration =
-    let unit f l =
-      let l = List.sort CCOrd.(opp string) l in
-      (ElemPeriod.elem <* white <* choice (List.map string_ci l) <* commit)
-      >>= f
-    in
-    let units = [
-      unit year ["y";"year";"years"];
-      unit month ["month";"months"];
-      unit day ["d";"day";"days"];
-      unit hour ["h";"hour";"hours"];
-      unit minute ["m";"min";"mins";"minute";"minutes"];
-      unit second ["s";"sec";"secs";"second";"seconds"];
-    ]
-    in
-    let elem =
-      choice ~failure_msg:"I do not recognize this time unit" units
-    in
-    let elems =
-      sep_by1 skip elem
-    in
-    List.fold_left C.Period.add C.Period.empty <$> elems
-
-  let duration =
-    (iso8601_duration <?> "I do not understand this ISO8601 duration")
-    <|> (human_duration <?> "I do not understand this duration")
-
-  let parser =
-    (string_ci "in" *> white *> commit *> duration) <|>
-    duration
-
-  let parse_duration s =
-    Angstrom.parse_string ~consume:Consume.All
-      (parser <** end_of_input) s
-
+  let parse = parse_string ~consume:Consume.All (duration <* end_of_input)
+  
 end
-
-let parse_duration s =
-  Parsing.parse_duration s
-
-let parse_durationl l =
-  let s = String.concat " " l in
-  parse_duration s
 
 let duration_of_daypack_duration (x : Daypack_lib.Duration.t) : duration =
   C.Period.lmake ~day:x.days ~hour:x.hours ~minute:x.minutes ~second:x.seconds ()
@@ -321,60 +216,42 @@ let search_param =
     search_years_ahead = 5;
   }
 
-let parse_durationl' l =
+let parse_duration l =
   let s = String.concat " " l in
   Daypack_lib.Duration.of_string s
   |> Result.map duration_of_daypack_duration
 
-let parse_time_pointl' l =
+let parse_time_point l =
   let open Daypack_lib in
   let s = String.concat " " l in
   match Time_expr.of_string s with
   | Ok x ->
-    (match Time_expr.next_match_time_slot search_param
-             x with
-    | Error msg -> Error msg
-    | Ok x ->
-      match x with
-      | None -> Error "Failed to find a matching time point"
-      | Some (time_slot_start, _time_slot_end) ->
+    begin match
+        Time_expr.next_match_time_slot search_param x
+      with
+      | Error msg -> Error msg
+      | Ok None -> Error "Failed to find a matching time point"
+      | Ok Some (time_slot_start, _time_slot_end) ->
         let cur = Time.Current.cur_unix_second () in
         let diff = if time_slot_start >= cur then Int64.sub time_slot_start cur else 0L in
         Duration.of_seconds diff
         |> Result.get_ok
         |> duration_of_daypack_duration
         |> Result.ok
-    )
+    end
   | Error s -> Error s
 
-let parse_deadlinel l =
+let parse_deadline l =
   match l with
-  | [] ->
-    Error "Empty expression"
-  | [_] -> (
-      match parse_durationl' l with
-      | Ok x -> Ok x
-      | Error _ ->
-        parse_time_pointl' l
-    )
-  | x :: xs -> (
-      if x = "in" then
-        parse_durationl' xs
-      else
-        if x = "at" then
-          parse_time_pointl' xs
-        else
-          match parse_durationl' l with
-          | Ok x -> Ok x
-          | Error _ ->
-            parse_time_pointl' l
-      )
-
-let parse_deadline s =
-  let l = String.split_on_char ' ' s in
-  parse_deadlinel l
+  | [] -> Error "Empty expression"
+  | "in" :: xs -> parse_duration xs
+  | "at" :: xs -> parse_time_point xs
+  | l -> 
+     begin match parse_duration l with
+       | Ok x -> Ok x
+       | Error _ ->
+         parse_time_point l
+     end
 
 let parse l =
-  let s = String.concat " " l in
-  (* Parsing.(CCResult.map of_duration @@ parse_duration s) *)
-  CCResult.map of_duration @@ parse_deadline s
+  CCResult.map of_duration @@ parse_deadline l

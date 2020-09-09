@@ -7,15 +7,12 @@ end
 let period : Period.t Alcotest.testable = (module Period)
 
 let periods =
-  let parse p s =
-    Angstrom.(parse_string ~consume:Consume.All (p <* end_of_input)) s
-  in
   let f s d =
     let open Alcotest in
     test_case d `Quick @@ fun () ->
     check (result period string) d
-      (parse Delay.Parsing.human_duration s)
-      (parse Delay.Parsing.iso8601_duration d)
+      (Delay.parse_duration @@ String.split_on_char ' ' s)
+      (Delay.Iso8601.parse s)
   in
   "Periods", [
     f "1s" "PT1S";
